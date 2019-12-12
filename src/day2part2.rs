@@ -4,22 +4,21 @@ use std::io::BufReader;
 
 struct IntcodeComputer {
     mem: Vec<u64>,
-    cur_index: usize
+    cur_index: usize,
 }
 
 impl IntcodeComputer {
-    fn run(&mut self) {
+    fn run(&mut self) -> Result<u64, &str> {
         loop {
             let op = self.mem[self.cur_index];
             match op {
                 1 => self.handle_add(),
                 2 => self.handle_multiply(),
-                99 => break,
-                _ => self.handle_error(),
+                99 => return self.handle_terminate(),
+                _ => return self.handle_error(),
             }
             self.cur_index += 4;
         }
-        self.handle_terminate();
     }
 
     fn handle_add(&mut self) {
@@ -36,16 +35,12 @@ impl IntcodeComputer {
         self.mem[dest] = val1 * val2;
     }
 
-    fn handle_terminate(&self) {
-        println!("Day 2 Part 1 position 0: {}", self.mem[0]);
+    fn handle_terminate(&self) -> Result<u64, &str> {
+        Ok(self.mem[0])
     }
 
-    fn handle_error(&self) {
-        println!(
-            "Error: Got bad opcode {} at position {}",
-            self.mem[self.cur_index], self.cur_index
-        );
-        println!("{:?}", self.mem);
+    fn handle_error(&self) -> Result<u64, &str> {
+        Err("Bad Opcode")
     }
 }
 
@@ -56,16 +51,31 @@ fn main() -> std::io::Result<()> {
     reader.read_line(&mut data)?;
     // Blindly delete trailing new line before parsing
     data.pop();
-    let mut comp = IntcodeComputer {
-        mem: data
-            .split(",")
-            .map(|m| m.parse::<u64>().unwrap())
-            .collect::<Vec<u64>>(),
-        cur_index: 0
-    };
-    // "Fix" the program
-    comp.mem[1] = 12;
-    comp.mem[2] = 2;
-    comp.run();
+
+    let initial_mem = data
+        .split(",")
+        .map(|m| m.parse::<u64>().unwrap())
+        .collect::<Vec<u64>>();
+
+    for noun in 0..100 {
+        for verb in 0..100 {
+            let mut comp = IntcodeComputer {
+                mem: initial_mem.clone(),
+                cur_index: 0,
+            };
+            comp.mem[1] = noun;
+            comp.mem[2] = verb;
+            match comp.run() {
+                Ok(v) => {
+                    if v == 19690720 {
+                        println!("(noun, verb) => ({},{})", noun, verb);
+                        println!("100 * noun + verb = {}", 100 * noun + verb);
+                        break;
+                    }
+                }
+                Err(e) => println!("{}", e),
+            }
+        }
+    }
     Ok(())
 }
