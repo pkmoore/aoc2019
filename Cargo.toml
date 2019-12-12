@@ -12,3 +12,7 @@ edition = "2018"
 [[bin]]
 name = "day1part1"
 path = "src/day1part1.rs"
+
+[[bin]]
+name = "day1part2"
+path = "src/day1part2.rs"
