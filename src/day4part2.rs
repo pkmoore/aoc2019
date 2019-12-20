@@ -3,13 +3,14 @@ fn main() -> std::io::Result<()> {
     // This range is puzzle input
     for i in 273025..767253 {
         let str_i = i.to_string();
-        if digits_always_increasing(&str_i) &&
-           adjacent_equal_digits_exist(&str_i) &&
-           str_i.len() == 6 {
-           results.push(i);
+        if str_i.len() == 6
+            && digits_always_increasing(&str_i)
+            && adjacent_equal_digits_exist(&str_i)
+        {
+            results.push(i);
         }
     }
-    println!("Day 4 part 1 numbers meeting rules: {}", results.len());
+    println!("Day 4 part 2 numbers meeting rules: {}", results.len());
     Ok(())
 }
 
@@ -27,11 +28,11 @@ fn adjacent_equal_digits_exist(i: &String) -> bool {
     let digits: Vec<u32> = i.chars().map(|x| x.to_digit(10).unwrap()).collect();
     let mut i = 0;
     let mut found;
-    while i < 6 {
-        if (i + 1 < 6) && digits.get(i) == digits.get(i + 1) {
+    while i < digits.len() {
+        if (i + 1 < digits.len()) && digits.get(i) == digits.get(i + 1) {
             // We might have found a double
             found = true;
-            if (i + 2 < 6) && digits.get(i) ==  digits.get(i + 2) {
+            if (i + 2 < digits.len()) && digits.get(i) == digits.get(i + 2) {
                 // This double is bad because it is at least a triple
                 found = false;
             }
