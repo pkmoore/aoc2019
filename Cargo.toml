@@ -9,6 +9,10 @@ edition = "2018"
 [dependencies]
 
 
+[lib]
+name = "intcode_computer"
+path = "lib/intcode_computer.rs"
+
 [[bin]]
 name = "day1part1"
 path = "src/day1part1.rs"
@@ -44,3 +48,7 @@ path = "src/day4part2.rs"
 [[bin]]
 name = "day5part1"
 path = "src/day5part1.rs"
+
+[[bin]]
+name = "day5part2"
+path = "src/day5part2.rs"
