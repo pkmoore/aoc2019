@@ -96,15 +96,13 @@ impl IntcodeComputer {
     pub fn run(&mut self) -> Result<i64, &str> {
         loop {
             let operation = Operation::new(self.mem[self.cur_index])?;
-            if operation.op == 99 {
-                return self.handle_terminate();
-            }
             match operation.op {
                 1 => self.handle_add(&operation)?,
                 2 => self.handle_multiply(&operation)?,
                 3 => self.handle_int_input(&operation)?,
                 4 => self.handle_int_output(&operation)?,
-                _ => return self.handle_error(),
+                99 => return self.handle_terminate(),
+                _ => return Err("Unsupported operation"),
             }
             self.cur_index += operation.param_count;
         }
@@ -165,9 +163,5 @@ impl IntcodeComputer {
         let val = self.get_value_accounting_for_mode(1, operation)?;
         println!("Output: {}", val);
         Ok(())
-    }
-
-    fn handle_error(&self) -> Result<i64, &str> {
-        Err("Bad Opcode")
     }
 }
