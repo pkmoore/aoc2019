@@ -63,12 +63,12 @@ impl Operation {
         } else {
             match (match operation.to_string().chars().last() {
                 Some(v) => v,
-                None => return Err("op_from_full_op: Invalid operation"),
+                None => return Err("op_from_full_op last: Invalid operation"),
             })
             .to_digit(10)
             {
                 Some(v) => Ok(v as i64),
-                None => return Err("op_from_full_op: Invalid operation"),
+                None => return Err("op_from_full_op to_digit: Invalid operation"),
             }
         }
     }
@@ -79,8 +79,12 @@ impl Operation {
             2 => Ok(4),
             3 => Ok(2),
             4 => Ok(2),
+            5 => Ok(3),
+            6 => Ok(3),
+            7 => Ok(4),
+            8 => Ok(4),
             99 => Ok(0),
-            _ => Err("Invalid Operation"),
+            _ => Err("operation_length: Invalid Operation"),
         }
     }
 }
@@ -101,11 +105,110 @@ impl IntcodeComputer {
                 2 => self.handle_multiply(&operation)?,
                 3 => self.handle_int_input(&operation)?,
                 4 => self.handle_int_output(&operation)?,
+                5 => self.handle_jump_if_true(&operation)?,
+                6 => self.handle_jump_if_false(&operation)?,
+                7 => self.handle_less_than(&operation)?,
+                8 => self.handle_equals(&operation)?,
                 99 => return self.handle_terminate(),
                 _ => return Err("Unsupported operation"),
             }
+        }
+    }
+
+    fn handle_less_than(&mut self, operation: &Operation) -> Result<(), &'static str> {
+        let val1 = self.get_value_accounting_for_mode(1, operation)?;
+        let val2 = self.get_value_accounting_for_mode(2, operation)?;
+        let dest = self.mem[self.cur_index + 3] as usize;
+        if val1 < val2 {
+            self.mem[dest] = 1;
+        } else {
+            self.mem[dest] = 0;
+        }
+        self.cur_index += operation.param_count;
+        Ok(())
+    }
+
+    fn handle_equals(&mut self, operation: &Operation) -> Result<(), &'static str> {
+        let val1 = self.get_value_accounting_for_mode(1, operation)?;
+        let val2 = self.get_value_accounting_for_mode(2, operation)?;
+        let dest = self.mem[self.cur_index + 3] as usize;
+        if val1 == val2 {
+            self.mem[dest] = 1;
+        } else {
+            self.mem[dest] = 0;
+        }
+        self.cur_index += operation.param_count;
+        Ok(())
+    }
+
+    fn handle_jump_if_true(&mut self, operation: &Operation) -> Result<(), &'static str> {
+        let val = self.get_value_accounting_for_mode(1, operation)?;
+        if val != 0 {
+            let jump_to = self.get_value_accounting_for_mode(2, operation)? as usize;
+            println!("Jumping to: {}", jump_to);
+            self.cur_index = jump_to;
+        } else {
             self.cur_index += operation.param_count;
         }
+        Ok(())
+    }
+
+    fn handle_jump_if_false(&mut self, operation: &Operation) -> Result<(), &'static str> {
+        let val = self.get_value_accounting_for_mode(1, operation)?;
+        if val == 0 {
+            let jump_to = self.get_value_accounting_for_mode(2, operation)? as usize;
+            println!("Jumping to: {}", jump_to);
+            self.cur_index = jump_to;
+        } else {
+            self.cur_index += operation.param_count;
+        }
+        Ok(())
+    }
+
+    fn handle_add(&mut self, operation: &Operation) -> Result<(), &'static str> {
+        let val1 = self.get_value_accounting_for_mode(1, operation)?;
+        let val2 = self.get_value_accounting_for_mode(2, operation)?;
+        let dest = self.mem[self.cur_index + 3] as usize;
+        self.mem[dest] = val1 + val2;
+        self.cur_index += operation.param_count;
+        Ok(())
+    }
+
+    fn handle_multiply(&mut self, operation: &Operation) -> Result<(), &'static str> {
+        let val1 = self.get_value_accounting_for_mode(1, operation)?;
+        let val2 = self.get_value_accounting_for_mode(2, operation)?;
+        let dest = self.mem[self.cur_index + 3] as usize;
+        self.mem[dest] = val1 * val2;
+        self.cur_index += operation.param_count;
+        Ok(())
+    }
+
+    fn handle_terminate(&self) -> Result<i64, &str> {
+        Ok(self.mem[0])
+    }
+
+    fn handle_int_input(&mut self, operation: &Operation) -> Result<(), &'static str> {
+        let mut input = String::new();
+        let dest = self.mem[self.cur_index + 1] as usize;
+        println!("Input: ");
+        match io::stdin().read_line(&mut input) {
+            Ok(_) => (),
+            Err(_) => return Err("Something went bad during I/O"),
+        }
+        input.pop();
+        self.mem[dest] = match input.parse::<i64>() {
+            Ok(v) => v,
+            Err(_) => return Err("Failed to parse input into an int"),
+        };
+        self.cur_index += operation.param_count;
+        Ok(())
+    }
+
+    fn handle_int_output(&mut self, operation: &Operation) -> Result<(), &'static str> {
+        let val = self.get_value_accounting_for_mode(1, operation)?;
+        println!("Output: {}", val);
+        self.cur_index += operation.param_count;
+        Ok(())
     }
 
     fn get_value_accounting_for_mode(
@@ -121,47 +224,5 @@ impl IntcodeComputer {
             },
             None => Err("Failed to get param mode from vector"),
         }
-    }
-
-    fn handle_add(&mut self, operation: &Operation) -> Result<(), &'static str> {
-        let val1 = self.get_value_accounting_for_mode(1, operation)?;
-        let val2 = self.get_value_accounting_for_mode(2, operation)?;
-        let dest = self.mem[self.cur_index + 3] as usize;
-        self.mem[dest] = val1 + val2;
-        Ok(())
-    }
-
-    fn handle_multiply(&mut self, operation: &Operation) -> Result<(), &'static str> {
-        let val1 = self.get_value_accounting_for_mode(1, operation)?;
-        let val2 = self.get_value_accounting_for_mode(2, operation)?;
-        let dest = self.mem[self.cur_index + 3] as usize;
-        self.mem[dest] = val1 * val2;
-        Ok(())
-    }
-
-    fn handle_terminate(&self) -> Result<i64, &str> {
-        Ok(self.mem[0])
-    }
-
-    fn handle_int_input(&mut self, _operation: &Operation) -> Result<(), &'static str> {
-        let mut input = String::new();
-        let dest = self.mem[self.cur_index + 1] as usize;
-        println!("Input: ");
-        match io::stdin().read_line(&mut input) {
-            Ok(_) => (),
-            Err(_) => return Err("Something went bad during I/O")
-        }
-        input.pop();
-        self.mem[dest] = match input.parse::<i64>() {
-            Ok(v) => v,
-            Err(_) => return Err("Failed to parse input into an int")
-        };
-        Ok(())
-    }
-
-    fn handle_int_output(&mut self, operation: &Operation) -> Result<(), &'static str> {
-        let val = self.get_value_accounting_for_mode(1, operation)?;
-        println!("Output: {}", val);
-        Ok(())
     }
 }
