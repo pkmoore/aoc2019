@@ -114,11 +114,29 @@ impl IntcodeComputer {
                 8 => self.handle_equals(&operation)?,
                 99 => return self.handle_terminate(),
                 _ => return Err("Unsupported operation"),
-            }
+            };
         }
     }
 
-    fn handle_less_than(&mut self, operation: &Operation) -> Result<(), &'static str> {
+    pub fn run_to_output(&mut self) -> Result<i64, &str> {
+        loop {
+            let operation = Operation::new(self.mem[self.cur_index])?;
+            match operation.op {
+                1 => self.handle_add(&operation)?,
+                2 => self.handle_multiply(&operation)?,
+                3 => self.handle_int_input(&operation)?,
+                4 => return self.handle_int_output(&operation),
+                5 => self.handle_jump_if_true(&operation)?,
+                6 => self.handle_jump_if_false(&operation)?,
+                7 => self.handle_less_than(&operation)?,
+                8 => self.handle_equals(&operation)?,
+                99 => return self.handle_terminate(),
+                _ => return Err("Unsupported operation"),
+            };
+        }
+    }
+
+    fn handle_less_than(&mut self, operation: &Operation) -> Result<i64, &'static str> {
         let val1 = self.get_value_accounting_for_mode(1, operation)?;
         let val2 = self.get_value_accounting_for_mode(2, operation)?;
         let dest = self.mem[self.cur_index + 3] as usize;
@@ -128,10 +146,10 @@ impl IntcodeComputer {
             self.mem[dest] = 0;
         }
         self.cur_index += operation.param_count;
-        Ok(())
+        Ok(self.mem[dest])
     }
 
-    fn handle_equals(&mut self, operation: &Operation) -> Result<(), &'static str> {
+    fn handle_equals(&mut self, operation: &Operation) -> Result<i64, &'static str> {
         let val1 = self.get_value_accounting_for_mode(1, operation)?;
         let val2 = self.get_value_accounting_for_mode(2, operation)?;
         let dest = self.mem[self.cur_index + 3] as usize;
@@ -141,10 +159,10 @@ impl IntcodeComputer {
             self.mem[dest] = 0;
         }
         self.cur_index += operation.param_count;
-        Ok(())
+        Ok(self.mem[dest])
     }
 
-    fn handle_jump_if_true(&mut self, operation: &Operation) -> Result<(), &'static str> {
+    fn handle_jump_if_true(&mut self, operation: &Operation) -> Result<i64, &'static str> {
         let val = self.get_value_accounting_for_mode(1, operation)?;
         if val != 0 {
             let jump_to = self.get_value_accounting_for_mode(2, operation)? as usize;
@@ -152,10 +170,10 @@ impl IntcodeComputer {
         } else {
             self.cur_index += operation.param_count;
         }
-        Ok(())
+        Ok(self.cur_index as i64)
     }
 
-    fn handle_jump_if_false(&mut self, operation: &Operation) -> Result<(), &'static str> {
+    fn handle_jump_if_false(&mut self, operation: &Operation) -> Result<i64, &'static str> {
         let val = self.get_value_accounting_for_mode(1, operation)?;
         if val == 0 {
             let jump_to = self.get_value_accounting_for_mode(2, operation)? as usize;
@@ -163,32 +181,32 @@ impl IntcodeComputer {
         } else {
             self.cur_index += operation.param_count;
         }
-        Ok(())
+        Ok(self.cur_index as i64)
     }
 
-    fn handle_add(&mut self, operation: &Operation) -> Result<(), &'static str> {
+    fn handle_add(&mut self, operation: &Operation) -> Result<i64, &'static str> {
         let val1 = self.get_value_accounting_for_mode(1, operation)?;
         let val2 = self.get_value_accounting_for_mode(2, operation)?;
         let dest = self.mem[self.cur_index + 3] as usize;
         self.mem[dest] = val1 + val2;
         self.cur_index += operation.param_count;
-        Ok(())
+        Ok(self.mem[dest])
     }
 
-    fn handle_multiply(&mut self, operation: &Operation) -> Result<(), &'static str> {
+    fn handle_multiply(&mut self, operation: &Operation) -> Result<i64, &'static str> {
         let val1 = self.get_value_accounting_for_mode(1, operation)?;
         let val2 = self.get_value_accounting_for_mode(2, operation)?;
         let dest = self.mem[self.cur_index + 3] as usize;
         self.mem[dest] = val1 * val2;
         self.cur_index += operation.param_count;
-        Ok(())
+        Ok(self.mem[dest])
     }
 
     fn handle_terminate(&self) -> Result<i64, &str> {
         Ok(self.mem[0])
     }
 
-    fn handle_int_input(&mut self, operation: &Operation) -> Result<(), &'static str> {
+    fn handle_int_input(&mut self, operation: &Operation) -> Result<i64, &'static str> {
         let mut input = String::new();
         let dest = self.mem[self.cur_index + 1] as usize;
         //If we have something in the computer's stdin vector, use that instead
@@ -208,15 +226,15 @@ impl IntcodeComputer {
             };
         }
         self.cur_index += operation.param_count;
-        Ok(())
+        Ok(self.mem[dest])
     }
 
-    fn handle_int_output(&mut self, operation: &Operation) -> Result<(), &'static str> {
+    fn handle_int_output(&mut self, operation: &Operation) -> Result<i64, &'static str> {
         let val = self.get_value_accounting_for_mode(1, operation)?;
         self.stdout.push(val);
         println!("Output: {}", val);
         self.cur_index += operation.param_count;
-        Ok(())
+        Ok(val)
     }
 
     fn get_value_accounting_for_mode(
