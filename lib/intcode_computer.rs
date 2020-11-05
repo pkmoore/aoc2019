@@ -1,8 +1,9 @@
-use std::io;
-
+#[derive(Debug)]
 pub struct IntcodeComputer {
     pub mem: Vec<i64>,
-    cur_index: usize,
+    pub stdin: Vec<i64>,
+    pub stdout: Vec<i64>,
+    pub cur_index: usize,
 }
 
 pub struct Operation {
@@ -94,6 +95,8 @@ impl IntcodeComputer {
         IntcodeComputer {
             mem: Vec::new(),
             cur_index: 0,
+            stdin: Vec::new(),
+            stdout: Vec::new(),
         }
     }
 
@@ -145,7 +148,6 @@ impl IntcodeComputer {
         let val = self.get_value_accounting_for_mode(1, operation)?;
         if val != 0 {
             let jump_to = self.get_value_accounting_for_mode(2, operation)? as usize;
-            println!("Jumping to: {}", jump_to);
             self.cur_index = jump_to;
         } else {
             self.cur_index += operation.param_count;
@@ -157,7 +159,6 @@ impl IntcodeComputer {
         let val = self.get_value_accounting_for_mode(1, operation)?;
         if val == 0 {
             let jump_to = self.get_value_accounting_for_mode(2, operation)? as usize;
-            println!("Jumping to: {}", jump_to);
             self.cur_index = jump_to;
         } else {
             self.cur_index += operation.param_count;
@@ -190,22 +191,29 @@ impl IntcodeComputer {
     fn handle_int_input(&mut self, operation: &Operation) -> Result<(), &'static str> {
         let mut input = String::new();
         let dest = self.mem[self.cur_index + 1] as usize;
-        println!("Input: ");
-        match io::stdin().read_line(&mut input) {
-            Ok(_) => (),
-            Err(_) => return Err("Something went bad during I/O"),
+        //If we have something in the computer's stdin vector, use that instead
+        //of reading from the keyboard
+        if self.stdin.len() > 0 {
+            self.mem[dest] = self.stdin.remove(0);
+        } else {
+            println!("Input: ");
+            match std::io::stdin().read_line(&mut input) {
+                Ok(_) => (),
+                Err(_) => return Err("Something went bad during I/O"),
+            }
+            input.pop();
+            self.mem[dest] = match input.parse::<i64>() {
+                Ok(v) => v,
+                Err(_) => return Err("Failed to parse input into an int"),
+            };
         }
-        input.pop();
-        self.mem[dest] = match input.parse::<i64>() {
-            Ok(v) => v,
-            Err(_) => return Err("Failed to parse input into an int"),
-        };
         self.cur_index += operation.param_count;
         Ok(())
     }
 
     fn handle_int_output(&mut self, operation: &Operation) -> Result<(), &'static str> {
         let val = self.get_value_accounting_for_mode(1, operation)?;
+        self.stdout.push(val);
         println!("Output: {}", val);
         self.cur_index += operation.param_count;
         Ok(())
