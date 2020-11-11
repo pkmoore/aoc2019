@@ -4,6 +4,7 @@ pub struct IntcodeComputer {
     pub stdin: Vec<i64>,
     pub stdout: Vec<i64>,
     pub cur_index: usize,
+    pub relative_base: i64,
 }
 
 pub struct Operation {
@@ -84,6 +85,7 @@ impl Operation {
             6 => Ok(3),
             7 => Ok(4),
             8 => Ok(4),
+            9 => Ok(2),
             99 => Ok(0),
             _ => Err("operation_length: Invalid Operation"),
         }
@@ -95,6 +97,7 @@ impl IntcodeComputer {
         IntcodeComputer {
             mem: Vec::new(),
             cur_index: 0,
+            relative_base: 0,
             stdin: Vec::new(),
             stdout: Vec::new(),
         }
@@ -112,6 +115,7 @@ impl IntcodeComputer {
                 6 => self.handle_jump_if_false(&operation)?,
                 7 => self.handle_less_than(&operation)?,
                 8 => self.handle_equals(&operation)?,
+                9 => self.handle_relative_base(&operation)?,
                 99 => return self.handle_terminate(),
                 _ => return Err("Unsupported operation"),
             };
@@ -130,16 +134,24 @@ impl IntcodeComputer {
                 6 => self.handle_jump_if_false(&operation)?,
                 7 => self.handle_less_than(&operation)?,
                 8 => self.handle_equals(&operation)?,
+                9 => self.handle_relative_base(&operation)?,
                 99 => return self.handle_terminate(),
                 _ => return Err("Unsupported operation"),
             };
         }
     }
 
+    fn handle_relative_base(&mut self, operation: &Operation) -> Result<i64, &'static str> {
+        let val1 = self.get_value_accounting_for_mode(1, operation)?;
+        self.relative_base += val1;
+        self.cur_index += operation.param_count;
+        Ok(self.relative_base)
+    }
+
     fn handle_less_than(&mut self, operation: &Operation) -> Result<i64, &'static str> {
         let val1 = self.get_value_accounting_for_mode(1, operation)?;
         let val2 = self.get_value_accounting_for_mode(2, operation)?;
-        let dest = self.mem[self.cur_index + 3] as usize;
+        let dest = self.get_address_accounting_for_mode(3, operation)?;
         if val1 < val2 {
             self.mem[dest] = 1;
         } else {
@@ -152,7 +164,7 @@ impl IntcodeComputer {
     fn handle_equals(&mut self, operation: &Operation) -> Result<i64, &'static str> {
         let val1 = self.get_value_accounting_for_mode(1, operation)?;
         let val2 = self.get_value_accounting_for_mode(2, operation)?;
-        let dest = self.mem[self.cur_index + 3] as usize;
+        let dest = self.get_address_accounting_for_mode(3, operation)?;
         if val1 == val2 {
             self.mem[dest] = 1;
         } else {
@@ -187,7 +199,7 @@ impl IntcodeComputer {
     fn handle_add(&mut self, operation: &Operation) -> Result<i64, &'static str> {
         let val1 = self.get_value_accounting_for_mode(1, operation)?;
         let val2 = self.get_value_accounting_for_mode(2, operation)?;
-        let dest = self.mem[self.cur_index + 3] as usize;
+        let dest = self.get_address_accounting_for_mode(3, operation)?;
         self.mem[dest] = val1 + val2;
         self.cur_index += operation.param_count;
         Ok(self.mem[dest])
@@ -196,7 +208,7 @@ impl IntcodeComputer {
     fn handle_multiply(&mut self, operation: &Operation) -> Result<i64, &'static str> {
         let val1 = self.get_value_accounting_for_mode(1, operation)?;
         let val2 = self.get_value_accounting_for_mode(2, operation)?;
-        let dest = self.mem[self.cur_index + 3] as usize;
+        let dest = self.get_address_accounting_for_mode(3, operation)?;
         self.mem[dest] = val1 * val2;
         self.cur_index += operation.param_count;
         Ok(self.mem[dest])
@@ -208,7 +220,8 @@ impl IntcodeComputer {
 
     fn handle_int_input(&mut self, operation: &Operation) -> Result<i64, &'static str> {
         let mut input = String::new();
-        let dest = self.mem[self.cur_index + 1] as usize;
+        let dest = self.get_address_accounting_for_mode(1, operation)?;
+
         //If we have something in the computer's stdin vector, use that instead
         //of reading from the keyboard
         if self.stdin.len() > 0 {
@@ -246,7 +259,31 @@ impl IntcodeComputer {
             Some(v) => match v {
                 0 => Ok(self.mem[self.mem[self.cur_index + param_no] as usize]),
                 1 => Ok(self.mem[self.cur_index + param_no]),
-                _ => Err("Got param mode other than 0 or 1"),
+                2 => {
+                    let param_val = self.mem[self.cur_index + param_no];
+                    let rel_addr = param_val + self.relative_base;
+                    Ok(self.mem[rel_addr as usize])
+                }
+                _ => Err("Got param mode other than 0, 1, 2"),
+            },
+            None => Err("Failed to get param mode from vector"),
+        }
+    }
+
+    fn get_address_accounting_for_mode(
+        &mut self,
+        param_no: usize,
+        operation: &Operation,
+    ) -> Result<usize, &'static str> {
+        match operation.param_modes.get(param_no) {
+            Some(v) => match v {
+                0 => Ok(self.mem[self.cur_index + param_no] as usize),
+                2 => {
+                    let param_val = self.mem[self.cur_index + param_no];
+                    let rel_addr = param_val + self.relative_base;
+                    Ok(rel_addr as usize)
+                }
+                _ => Err("Got param mode other than 0 or 2"),
             },
             None => Err("Failed to get param mode from vector"),
         }
